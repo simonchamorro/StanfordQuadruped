@@ -6,7 +6,6 @@ import adafruit_ads1x15.ads1015 as ADS
 from adafruit_ads1x15.analog_in import AnalogIn
 from adafruit_extended_bus import ExtendedI2C as I2C
 from pupper.HardwareInterface import HardwareInterface
-from pupper.HardwareConfig import NEUTRAL_ANGLE_DEGREES
 
 
 # Key = leg_idx, motor_idx
@@ -27,7 +26,7 @@ MOTOR2BIN = {(0, 0):  [0, 0, 0],
 # GPIO pins, not the same as pin numbers
 # see: http://abyz.me.uk/rpi/pigpio/index.html#Type_3
 MUX_PINS_FRONT = [16, 26, 19]
-MUX_PINS_BACK = [6, 5, 0]
+# MUX_PINS_BACK = [6, 5, 0]
 
 
 def set_motor(pi, motor=0, mux_pins=[]):
@@ -47,6 +46,7 @@ def degrees_to_radians(input_array):
 def calibrate_encoders(hardware_interface):
     # Create the I2C bus
     i2c = I2C(4)
+    delay = 0.6
 
     # Create Pi object
     pi = pigpio.pi()
@@ -60,7 +60,7 @@ def calibrate_encoders(hardware_interface):
     
     # Encoder matrix
     # encoder_config[leg_idx, motor_idx] = [neutral_voltage, volts / deg ratio, min, max]
-    encoder_config = np.zeros(4, 3, 4) 
+    encoder_config = np.zeros((4, 3, 4)) 
 
     print("\n===========================\n")
     for leg_idx in range(4):
@@ -73,42 +73,39 @@ def calibrate_encoders(hardware_interface):
             while not motor_config_done:
                 motor_name = get_motor_name(motor_idx, leg_idx)
                 print("\n\nCalibrating the **" + motor_name + " motor **")
-                move_input = str(input("Enter 'a' to start calibrating, the motor will move to neutral position, then neutral + 30 and neutral - 30"))
+                move_input = str(input("Enter 'a' to start calibrating, the motor will move to neutral position, then neutral + 30 and neutral - 30:\n"))
                 
                 if not move_input == "a":   
                     pass
                 
                 # Set the mux to desired motor
                 set_motor(pi, (leg_idx, motor_idx), MUX_PINS_FRONT)
-                set_motor(pi, (leg_idx, motor_idx), MUX_PINS_BACK)
+                # set_motor(pi, (leg_idx, motor_idx), MUX_PINS_BACK)
                 
                 # Set the motor to the neutral position
-                hardware_interface.set_actuator_position(
-                    degrees_to_radians(NEUTRAL_ANGLE_DEGREES[motor_idx, leg_idx]),
-                    motor_idx,
-                    leg_idx,
-                    ) 
+                time.sleep(delay)
+                hardware_interface.set_actuator_position(0, motor_idx, leg_idx) 
                 
                 # Read the encoder value
-                time.sleep(0.5)
+                time.sleep(delay)
                 neutral_voltage = chan.voltage
                 encoder_config[leg_idx, motor_idx, 0] = neutral_voltage
                 
                 # Set the motor to the max position and read value
-                hardware_interface.set_actuator_position(
-                    degrees_to_radians(NEUTRAL_ANGLE_DEGREES[motor_idx, leg_idx] + 30),
-                    motor_idx,
-                    leg_idx)
-                time.sleep(0.5)
+                time.sleep(delay)
+                hardware_interface.set_actuator_position(degrees_to_radians(30), motor_idx, leg_idx)
+                time.sleep(delay)
                 max_val = chan.voltage
                 
                 # Set the motor to the min position
-                hardware_interface.set_actuator_position(
-                    degrees_to_radians(NEUTRAL_ANGLE_DEGREES[motor_idx, leg_idx] - 30),
-                    motor_idx,
-                    leg_idx)
-                time.sleep(0.5)
+                time.sleep(delay)
+                hardware_interface.set_actuator_position(degrees_to_radians(-30), motor_idx, leg_idx)
+                time.sleep(delay)
                 min_val = chan.voltage
+
+                # Set the motor to the neutral position
+                time.sleep(delay)
+                hardware_interface.set_actuator_position(0, motor_idx, leg_idx) 
                 
                 ratio = (max_val - min_val) / 60.0
                 encoder_config[leg_idx, motor_idx, 1] = ratio
@@ -128,7 +125,9 @@ def main():
     print("\n\n CALIBRATION COMPLETE!\n")
     print("Calibrated encoder values:")
     print(config)
-    
+    np.savez("encoder_config.npz", encoder_calib=config)
+    a = np.load("encoder_config.npz")["encoder_calib"]
+    print(a)
 
 if __name__ == "__main__":
     main()    
