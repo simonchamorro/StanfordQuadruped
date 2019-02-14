@@ -28,6 +28,9 @@ MOTOR2BIN = {(0, 0):  [0, 0, 0],
 MUX_PINS_FRONT = [16, 26, 19]
 # MUX_PINS_BACK = [6, 5, 0]
 
+# Neutral positions
+NEUTRAL_POS = [0, 45, -45]
+
 
 def set_motor(pi, motor=0, mux_pins=[]):
     bin_num = MOTOR2BIN[motor]
@@ -72,6 +75,7 @@ def calibrate_encoders(hardware_interface):
             motor_config_done = False
             while not motor_config_done:
                 motor_name = get_motor_name(motor_idx, leg_idx)
+                motor_pos = NEUTRAL_POS[motor_idx]
                 print("\n\nCalibrating the **" + motor_name + " motor **")
                 move_input = str(input("Enter 'a' to start calibrating, the motor will move to neutral position, then neutral + 30 and neutral - 30:\n"))
                 
@@ -84,7 +88,7 @@ def calibrate_encoders(hardware_interface):
                 
                 # Set the motor to the neutral position
                 time.sleep(delay)
-                hardware_interface.set_actuator_position(0, motor_idx, leg_idx) 
+                hardware_interface.set_actuator_position(degrees_to_radians(motor_pos), motor_idx, leg_idx) 
                 
                 # Read the encoder value
                 time.sleep(delay)
@@ -93,19 +97,19 @@ def calibrate_encoders(hardware_interface):
                 
                 # Set the motor to the max position and read value
                 time.sleep(delay)
-                hardware_interface.set_actuator_position(degrees_to_radians(30), motor_idx, leg_idx)
+                hardware_interface.set_actuator_position(degrees_to_radians(motor_pos + 30), motor_idx, leg_idx)
                 time.sleep(delay)
                 max_val = chan.voltage
                 
                 # Set the motor to the min position
                 time.sleep(delay)
-                hardware_interface.set_actuator_position(degrees_to_radians(-30), motor_idx, leg_idx)
+                hardware_interface.set_actuator_position(degrees_to_radians(motor_pos - 30), motor_idx, leg_idx)
                 time.sleep(delay)
                 min_val = chan.voltage
 
                 # Set the motor to the neutral position
                 time.sleep(delay)
-                hardware_interface.set_actuator_position(0, motor_idx, leg_idx) 
+                hardware_interface.set_actuator_position(degrees_to_radians(motor_pos), motor_idx, leg_idx)
                 
                 ratio = (max_val - min_val) / 60.0
                 encoder_config[leg_idx, motor_idx, 1] = ratio
