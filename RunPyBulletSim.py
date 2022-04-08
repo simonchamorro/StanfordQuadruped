@@ -93,4 +93,4 @@ def main(use_imu=False, default_velocity=np.zeros(2), default_yaw_rate=0.0):
 
 
 if __name__ == "__main__":
-    main(default_velocity=np.array([0.15, 0]))
+    main(default_velocity=np.array([0, 0]))
