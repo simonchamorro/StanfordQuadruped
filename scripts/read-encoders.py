@@ -4,22 +4,32 @@ import adafruit_ads1x15.ads1015 as ADS
 from adafruit_ads1x15.analog_in import AnalogIn
 from adafruit_extended_bus import ExtendedI2C as I2C
 
-MOTOR2BIN = {0:  [0, 0, 0, 0],
-             1:  [1, 0, 0, 0],
-             2:  [0, 1, 0, 0],
-             3:  [1, 1, 0, 0],
-             4:  [0, 0, 1, 0],
-             5:  [1, 0, 1, 0],
-             6:  [0, 1, 1, 0],
-             7:  [1, 1, 1, 0],
-             8:  [0, 0, 0, 1],
-             9:  [1, 0, 0, 1],
-             10: [0, 1, 0, 1],
-             11: [1, 1, 0, 1],}
+# MOTOR2BIN = {0:  [0, 0, 0, 0],
+#              1:  [1, 0, 0, 0],
+#              2:  [0, 1, 0, 0],
+#              3:  [1, 1, 0, 0],
+#              4:  [0, 0, 1, 0],
+#              5:  [1, 0, 1, 0],
+#              6:  [0, 1, 1, 0],
+#              7:  [1, 1, 1, 0],
+#              8:  [0, 0, 0, 1],
+#              9:  [1, 0, 0, 1],
+#              10: [0, 1, 0, 1],
+#              11: [1, 1, 0, 1],}
+
+MOTOR2BIN = {0:  [0, 0, 0],
+             1:  [1, 0, 0],
+             2:  [0, 1, 0],
+             3:  [1, 1, 0],
+             4:  [0, 0, 1],
+             5:  [1, 0, 1],
+             6:  [0, 1, 1],
+             7:  [1, 1, 1]}
 
 # GPIO pins, not the same as pin numbers
 # see: http://abyz.me.uk/rpi/pigpio/index.html#Type_3
-MUX_PINS = [16, 26, 6, 5]
+# MUX_PINS = [16, 26, 6, 5]
+MUX_PINS = [16, 26, 6]
 
 def set_motor(pi, motor=0):
     bin_num = MOTOR2BIN[motor]
@@ -51,14 +61,14 @@ while True:
         set_motor(pi, motor=i+3)
         print("{:>5}\t{:>5.3f}".format(i, chan.voltage))
     
-    print('Rear Right')
-    for i in range(3):
-        set_motor(pi, motor=i+6)
-        print("{:>5}\t{:>5.3f}".format(i, chan.voltage))
+    # print('Rear Right')
+    # for i in range(3):
+    #     set_motor(pi, motor=i+6)
+    #     print("{:>5}\t{:>5.3f}".format(i, chan.voltage))
     
-    print('Rear Left')
-    for i in range(3):
-        set_motor(pi, motor=i+9)
-        print("{:>5}\t{:>5.3f}".format(i, chan.voltage))
+    # print('Rear Left')
+    # for i in range(3):
+    #     set_motor(pi, motor=i+9)
+    #     print("{:>5}\t{:>5.3f}".format(i, chan.voltage))
     
     time.sleep(1.0)
