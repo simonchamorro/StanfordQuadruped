@@ -13,17 +13,52 @@ from sim.HardwareInterface import HardwareInterface
 from pupper.Config import Configuration
 from pupper.Kinematics import four_legs_inverse_kinematics
 
+# import rsl_rl module
+from policy.rsl_rl.modules import ActorCritic
+from policy.rsl_rl.algorithms import PPO
 
-def main(use_imu=False, default_velocity=np.zeros(2), default_yaw_rate=0.0):
+import torch
+import torch.nn as nn
+import torch.functional as F
+
+import os
+import glob
+
+def get_policy(path, obs_dim = 235, act_dim=12, actor_hidden_dims=[512, 256, 128], critic_hidden_dims=[512, 256, 128]):
+
+    obs_dim_actor = obs_dim
+    obs_dim_critic = obs_dim
+
+    if not torch.cuda.is_available():
+        device = torch.device('cpu')
+    else:
+        device = torch.device('cuda')
+
+    loaded_dict = torch.load(path, map_location=device)
+
+    actor_critic = ActorCritic(obs_dim_actor, obs_dim_critic, act_dim, actor_hidden_dims=actor_hidden_dims, critic_hidden_dims=critic_hidden_dims).to(device)
+    alg = PPO(actor_critic, device=device)
+
+    actor_critic.load_state_dict(loaded_dict["model_state_dict"])
+    current_learning_iteration = loaded_dict["iter"]
+    actor_critic.eval()  # switch to evaluation mode (dropout for example)
+    actor_critic.to(device)
+    return actor_critic.act_inference#self.alg.actor_critic.act_inference
+
+def main(use_imu=False, default_velocity=np.zeros(2), default_yaw_rate=0.0, policy_path=None):
     # Create config
     config = Configuration()
     config.z_clearance = 0.02
     sim = Sim(xml_path="sim/pupper_pybullet_out.xml")
     hardware_interface = HardwareInterface(sim.model, sim.joint_indices)
 
+    # Load Model
+    model = get_policy(policy_path)
+
     # Create imu handle
     if use_imu:
         imu = IMU()
+
 
     # Create controller and user input handles
     controller = Controller(config, four_legs_inverse_kinematics,)
@@ -73,7 +108,8 @@ def main(use_imu=False, default_velocity=np.zeros(2), default_yaw_rate=0.0):
             )
 
             # Step the controller forward by dt
-            controller.run(state, command)
+            command  = model(torch.randn(235)).view(3,4)
+            controller.send_action(state, command)
 
             # Update the pwm widths going to the servos
             hardware_interface.set_actuator_postions(state.joint_angles)
@@ -93,4 +129,9 @@ def main(use_imu=False, default_velocity=np.zeros(2), default_yaw_rate=0.0):
 
 
 if __name__ == "__main__":
-    main(default_velocity=np.array([0, 0]))
+
+    policy_path = "./policy/pupper/*"
+    models = [file for file in glob.glob(policy_path) if "model" in file]
+    last_models_path = models[-1]
+
+    main(default_velocity=np.array([0, 0]), policy_path=last_models_path)
