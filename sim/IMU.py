@@ -10,4 +10,10 @@ class IMU:
         return np.array(
             [q_scalar_last[3], q_scalar_last[0], q_scalar_last[1], q_scalar_last[2]]
         )
+        
+    def read_lin_ang_vel(self):
+        lin_vel = np.zeros(3)
+        ang_vel = np.zeros(3)
+        breakpoint()
+        return lin_vel, ang_vel
 

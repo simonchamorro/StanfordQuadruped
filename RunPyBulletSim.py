@@ -15,7 +15,7 @@ from pupper.Config import Configuration
 from pupper.Kinematics import four_legs_inverse_kinematics
 
 
-def main(use_imu=True, default_velocity=np.zeros(2), default_yaw_rate=0.0):
+def main(default_velocity=np.zeros(2), default_yaw_rate=0.0):
     # Create config
     config = Configuration()
     config.z_clearance = 0.02
@@ -23,8 +23,7 @@ def main(use_imu=True, default_velocity=np.zeros(2), default_yaw_rate=0.0):
     hardware_interface = HardwareInterface(sim.model, sim.joint_indices)
 
     # Create imu handle
-    if use_imu:
-        imu = IMU()
+    imu = IMU()
     
     # Create simulated encoders
     encoders = Encoders()
@@ -71,13 +70,12 @@ def main(use_imu=True, default_velocity=np.zeros(2), default_yaw_rate=0.0):
         if sim_time_elapsed - last_control_update > config.dt:
             last_control_update = sim_time_elapsed
 
-            # Get IMU measurement if enabled
-            state.quat_orientation = (
-                imu.read_orientation() if use_imu else np.array([1, 0, 0, 0])
-            )
+            # Get IMU measurement
+            state.quat_orientation = imu.read_orientation()
             
             # Get joint positions and velocities
             joint_pos, joint_vel = encoders.read_pos_vel()
+            lin_vel, ang_vel =  imu.read_lin_ang_vel()
 
             # Step the controller forward by dt
             controller.run(state, command)
