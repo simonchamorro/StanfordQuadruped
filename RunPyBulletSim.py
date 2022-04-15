@@ -8,7 +8,7 @@ from sim.encoders import Encoders
 from sim.Sim import Sim
 from common.Controller import Controller
 from common.Command import Command
-from common.JoystickInterface import JoystickInterface
+# from common.JoystickInterface import JoystickInterface
 from common.State import State
 from sim.HardwareInterface import HardwareInterface
 from pupper.Config import Configuration
@@ -46,9 +46,7 @@ def get_policy(path, obs_dim = 235, act_dim=12, actor_hidden_dims=[512, 256, 128
     actor_critic.to(device)
     return actor_critic.act_inference#self.alg.actor_critic.act_inference
 
-  
-def main(default_velocity=np.zeros(2), default_yaw_rate=0.0):
-  
+def main(use_imu=True, default_velocity=np.zeros(2), default_yaw_rate=0.0, policy_path=None):
     # Create config
     config = Configuration()
     config.z_clearance = 0.02
@@ -59,10 +57,10 @@ def main(default_velocity=np.zeros(2), default_yaw_rate=0.0):
     model = get_policy(policy_path)
 
     # Create imu handle
-    imu = IMU()
-    
-    # Create simulated encoders
-    encoders = Encoders()
+    if use_imu:
+        imu = IMU()
+        imu._simulator_observation()
+        # break
 
 
     # Create controller and user input handles
