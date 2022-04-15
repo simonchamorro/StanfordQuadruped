@@ -4,6 +4,7 @@ import time
 import numpy as np
 
 from sim.IMU import IMU
+from sim.encoders import Encoders
 from sim.Sim import Sim
 from common.Controller import Controller
 from common.Command import Command
@@ -104,10 +105,12 @@ def main(use_imu=True, default_velocity=np.zeros(2), default_yaw_rate=0.0, polic
         if sim_time_elapsed - last_control_update > config.dt:
             last_control_update = sim_time_elapsed
 
-            # Get IMU measurement if enabled
-            state.quat_orientation = (
-                imu.read_orientation() if use_imu else np.array([1, 0, 0, 0])
-            )
+            # Get IMU measurement
+            state.quat_orientation = imu.read_orientation()
+            
+            # Get joint positions and velocities
+            joint_pos, joint_vel = encoders.read_pos_vel()
+            lin_vel, ang_vel =  imu.read_lin_ang_vel()
 
             # Step the controller forward by dt
             command  = model(torch.randn(235)).view(3,4)
