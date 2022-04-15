@@ -4,6 +4,7 @@ import time
 import numpy as np
 
 from sim.IMU import IMU
+from sim.encoders import Encoders
 from sim.Sim import Sim
 from common.Controller import Controller
 from common.Command import Command
@@ -45,7 +46,9 @@ def get_policy(path, obs_dim = 235, act_dim=12, actor_hidden_dims=[512, 256, 128
     actor_critic.to(device)
     return actor_critic.act_inference#self.alg.actor_critic.act_inference
 
-def main(use_imu=False, default_velocity=np.zeros(2), default_yaw_rate=0.0, policy_path=None):
+  
+def main(default_velocity=np.zeros(2), default_yaw_rate=0.0):
+  
     # Create config
     config = Configuration()
     config.z_clearance = 0.02
@@ -56,8 +59,10 @@ def main(use_imu=False, default_velocity=np.zeros(2), default_yaw_rate=0.0, poli
     model = get_policy(policy_path)
 
     # Create imu handle
-    if use_imu:
-        imu = IMU()
+    imu = IMU()
+    
+    # Create simulated encoders
+    encoders = Encoders()
 
 
     # Create controller and user input handles
@@ -102,10 +107,12 @@ def main(use_imu=False, default_velocity=np.zeros(2), default_yaw_rate=0.0, poli
         if sim_time_elapsed - last_control_update > config.dt:
             last_control_update = sim_time_elapsed
 
-            # Get IMU measurement if enabled
-            state.quat_orientation = (
-                imu.read_orientation() if use_imu else np.array([1, 0, 0, 0])
-            )
+            # Get IMU measurement
+            state.quat_orientation = imu.read_orientation()
+            
+            # Get joint positions and velocities
+            joint_pos, joint_vel = encoders.read_pos_vel()
+            lin_vel, ang_vel =  imu.read_lin_ang_vel()
 
             # Step the controller forward by dt
             command  = model(torch.randn(235)).view(3,4)
