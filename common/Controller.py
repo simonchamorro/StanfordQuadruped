@@ -10,7 +10,6 @@ from transforms3d.euler import euler2mat, quat2euler
 from transforms3d.quaternions import qconjugate, quat2axangle
 from transforms3d.axangles import axangle2mat
 
-
 class Controller:
     """Controller and planner object
     """
@@ -152,14 +151,36 @@ class Controller:
                 )
                 @ state.foot_locations
             )
-            state.joint_angles = self.inverse_kinematics(
-                rotated_foot_locations, self.config
-            )
+        state.joint_angles = self.inverse_kinematics(
+            rotated_foot_locations, self.config
+        )
+
+        print("JOINT ANGLES:", state.joint_angles.shape)
 
         state.ticks += 1
         state.pitch = command.pitch
         state.roll = command.roll
         state.height = command.height
+
+
+
+    def send_action(self, state, command):
+        """Steps the controller forward one timestep given it a command from the policy.
+
+        Parameters
+        ----------
+        controller : Controller
+            Robot controller object.
+        """
+
+        offset = np.array([[-0.15, 0.15, -0.15, 0.15],
+                           [0.5, 0.5, 0.7, 0.7],
+                           [-1.0, -1.0, -1.0, -1.0]])
+
+        actions = command.detach().cpu().numpy()
+
+        state.joint_angles = actions + offset
+        state.ticks += 1
 
     def set_pose_to_default(self):
         state.foot_locations = (
