@@ -4,6 +4,7 @@ import time
 import numpy as np
 
 from sim.IMU import IMU
+from sim.encoders import Encoders
 from sim.Sim import Sim
 from common.Controller import Controller
 from common.Command import Command
@@ -14,7 +15,7 @@ from pupper.Config import Configuration
 from pupper.Kinematics import four_legs_inverse_kinematics
 
 
-def main(use_imu=False, default_velocity=np.zeros(2), default_yaw_rate=0.0):
+def main(use_imu=True, default_velocity=np.zeros(2), default_yaw_rate=0.0):
     # Create config
     config = Configuration()
     config.z_clearance = 0.02
@@ -24,6 +25,9 @@ def main(use_imu=False, default_velocity=np.zeros(2), default_yaw_rate=0.0):
     # Create imu handle
     if use_imu:
         imu = IMU()
+    
+    # Create simulated encoders
+    encoders = Encoders()
 
     # Create controller and user input handles
     controller = Controller(config, four_legs_inverse_kinematics,)
@@ -71,6 +75,9 @@ def main(use_imu=False, default_velocity=np.zeros(2), default_yaw_rate=0.0):
             state.quat_orientation = (
                 imu.read_orientation() if use_imu else np.array([1, 0, 0, 0])
             )
+            
+            # Get joint positions and velocities
+            joint_pos, joint_vel = encoders.read_pos_vel()
 
             # Step the controller forward by dt
             controller.run(state, command)
