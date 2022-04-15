@@ -112,7 +112,6 @@ def main(use_imu=False, policy_path=None):
 
             # Step the controller forward by dt
             #controller.run(state, command)
-            state = TODO
             obs = TODO
             command  = model(obs).view(3,4)
             # WATCH OUT HERE IS STATE
@@ -125,5 +124,4 @@ if __name__ == "__main__":
     policy_path = "./policy/pupper/*"
     models = [file for file in glob.glob(policy_path) if "model" in file]
     last_models_path = models[-1]
-
-    main()
+    main(policy_path=last_models_path)
