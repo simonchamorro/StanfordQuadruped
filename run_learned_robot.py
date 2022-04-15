@@ -16,6 +16,8 @@ import torch
 import torch.nn as nn
 import torch.functional as F
 
+import glob
+import os
 
 def get_policy(path, obs_dim = 235, act_dim=12, actor_hidden_dims=[512, 256, 128], critic_hidden_dims=[512, 256, 128]):
     """
@@ -84,9 +86,9 @@ def main(use_imu=False, policy_path=None):
     while True:
         print("Waiting for L1 to activate robot.")
         while True:
-            command = joystick_interface.get_command(state)
+            joystick_command = joystick_interface.get_command(state)
             joystick_interface.set_color(config.ps4_deactivated_color)
-            if command.activate_event == 1:
+            if joystick_command.activate_event == 1:
                 break
             time.sleep(0.1)
         print("Robot activated.")
@@ -99,8 +101,8 @@ def main(use_imu=False, policy_path=None):
             last_loop = time.time()
 
             # Parse the udp joystick commands and then update the robot controller's parameters
-            command = joystick_interface.get_command(state)
-            if command.activate_event == 1:
+            joystick_command = joystick_interface.get_command(state)
+            if joystick_command.activate_event == 1:
                 print("Deactivating Robot")
                 break
 
@@ -112,6 +114,9 @@ def main(use_imu=False, policy_path=None):
 
             # Step the controller forward by dt
             #controller.run(state, command)
+            horizontal_velocity = joystick_command.horizontal_velocity
+            yaw_rate = joystick_command.yaw_rate
+
             obs = TODO
             command  = model(obs).view(3,4)
             # WATCH OUT HERE IS STATE
