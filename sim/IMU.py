@@ -1,3 +1,5 @@
+
+import time
 import numpy as np
 import pybullet
 
@@ -6,31 +8,40 @@ class IMU:
     def __init__(self, simulator=True):
         
         self.simulator = simulator
-        self.prev_pos = None
-        self.prev_angle = None
+        self.last_pos = [None, None, None]
+        self.last_ang = [None, None, None]
 
-    def _simulator_observation(self, dt=1/240.0, urdf_id=1):
-        # URDF ID
 
-        base_position, base_orientation = pybullet.getBasePositionAndOrientation(urdf_id)
+    def _simulator_observation(self, urdf_id=1, dt=1/60):
+        # Get the current position and orientation of the robot
+        base_position, q = pybullet.getBasePositionAndOrientation(urdf_id)
+        base_orientation = np.array([q[3], q[0], q[1], q[2]])
+        base_position = np.array(base_position)
 
-        projection_gravity = np.array([0, 0, -9.81]) @ self._compute_rotation_matrix(base_orientation)
-        obj_euler = pybullet.getEulerFromQuaternion(base_orientation)
+        # Compute the rotation matrix and orientation angles
+        R = self._compute_rotation_matrix(base_orientation)
+        projected_gravity = np.array([0, 0, -9.81]) @ R
+        yaw, pitch, roll = self._get_angles_from_quat(base_orientation)
+        angular_orientation = np.array([yaw, pitch, roll])
         
-        if self.prev_pos == None:
-            velocity = base_position
+        # Compute the velocity
+        if None in self.last_pos:
+            velocity = np.array([0, 0, 0])
         else:
-            velocity = (base_postion - self.prev_pos) / dt
-        
-        if self.prev_angle == None:
-            ang_velocity = obj_euler
-            self.prev_pos = base_position
+            # velocity = (base_position - self.last_pos) / dt # in global frame
+            velocity = - np.dot(self.last_pos - base_position, R) / dt # in robot frame
+        self.last_pos = base_position
+
+        # Compute the angular velocity
+        if None in self.last_ang:
+            ang_velocity = np.array([0, 0, 0])
         else:
-            ang_velocity = (obj_euler - self.prev_angle) / dt
-            self.prev_angle = obj_euler
+            # ang_velocity = (angular_orientation - self.last_ang) / dt # in global frame
+            ang_velocity = - np.dot(self.last_ang - angular_orientation, R) # in robot frame
+        self.last_ang = angular_orientation
 
+        return velocity, ang_velocity, projected_gravity
 
-        return velocity, ang_velocity, projection_gravity
 
     def read_orientation(self):        
         return pybullet.getBasePositionAndOrientation(1)[1]
@@ -49,10 +60,10 @@ class IMU:
                 frame to a point in the global reference frame.
         """
         # Extract the values from Q
-        q0 = Q[0]
-        q1 = Q[1]
-        q2 = Q[2]
-        q3 = Q[3]
+        q0 = Q[0] # W
+        q1 = Q[1] # X
+        q2 = Q[2] # Y
+        q3 = Q[3] # Z
         
         # First row of the rotation matrix
         r00 = 2 * (q0 * q0 + q1 * q1) - 1
@@ -75,6 +86,15 @@ class IMU:
                             [r20, r21, r22]])
                                 
         return rot_matrix
+    
+
+    def _get_angles_from_quat(self, q):
+        w, x, y, z = q
+        yaw = np.arctan2(2.0*(y*z + w*x), w*w - x*x - y*y + z*z)
+        pitch = np.arcsin(-2.0*(x*z - w*y))
+        roll = np.arctan2(2.0*(x*y + w*z), w*w + x*x - y*y - z*z)
+        return yaw, pitch, roll
+
 
 
 

@@ -154,14 +154,11 @@ class Controller:
         state.joint_angles = self.inverse_kinematics(
             rotated_foot_locations, self.config
         )
-
-        print("JOINT ANGLES:", state.joint_angles.shape)
-
+        # print("JOINT ANGLES:", state.joint_angles.shape)
         state.ticks += 1
         state.pitch = command.pitch
         state.roll = command.roll
         state.height = command.height
-
 
 
     def send_action(self, state, command):
@@ -181,6 +178,7 @@ class Controller:
 
         state.joint_angles = actions + offset
         state.ticks += 1
+
 
     def set_pose_to_default(self):
         state.foot_locations = (

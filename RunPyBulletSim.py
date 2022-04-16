@@ -25,15 +25,13 @@ import torch.functional as F
 import os
 import glob
 
+
 def get_policy(path, obs_dim = 235, act_dim=12, actor_hidden_dims=[512, 256, 128], critic_hidden_dims=[512, 256, 128]):
 
     obs_dim_actor = obs_dim
     obs_dim_critic = obs_dim
 
-    if not torch.cuda.is_available():
-        device = torch.device('cpu')
-    else:
-        device = torch.device('cuda')
+    device = torch.device('cpu')
 
     loaded_dict = torch.load(path, map_location=device)
 
@@ -46,7 +44,8 @@ def get_policy(path, obs_dim = 235, act_dim=12, actor_hidden_dims=[512, 256, 128
     actor_critic.to(device)
     return actor_critic.act_inference#self.alg.actor_critic.act_inference
 
-def main(use_imu=True, default_velocity=np.zeros(2), default_yaw_rate=0.0, policy_path=None):
+
+def main(default_velocity=np.zeros(2), default_yaw_rate=0.0, policy_path=None, use_policy=False):
     # Create config
     config = Configuration()
     config.z_clearance = 0.02
@@ -57,11 +56,9 @@ def main(use_imu=True, default_velocity=np.zeros(2), default_yaw_rate=0.0, polic
     model = get_policy(policy_path)
 
     # Create imu handle
-    if use_imu:
-        imu = IMU()
-        imu._simulator_observation()
-        # break
-
+    encoders = Encoders()
+    imu = IMU()
+    imu._simulator_observation()
 
     # Create controller and user input handles
     controller = Controller(config, four_legs_inverse_kinematics,)
@@ -80,22 +77,11 @@ def main(use_imu=True, default_velocity=np.zeros(2), default_yaw_rate=0.0, polic
     command.horizontal_velocity = default_velocity
     command.yaw_rate = default_yaw_rate
 
-    # The joystick service is linux-only, so commenting out for mac
-    # print("Creating joystick listener...")
-    # joystick_interface = JoystickInterface(config)
-    # print("Done.")
-
-    print("Summary of gait parameters:")
-    print("overlap time: ", config.overlap_time)
-    print("swing time: ", config.swing_time)
-    print("z clearance: ", config.z_clearance)
-    print("x shift: ", config.x_shift)
-
     # Run the simulation
     timesteps = 240 * 60 * 10  # simulate for a max of 10 minutes
 
     # Sim seconds per sim step
-    sim_steps_per_sim_second = 240
+    sim_steps_per_sim_second = 60
     sim_dt = 1.0 / sim_steps_per_sim_second
     last_control_update = 0
     start = time.time()
@@ -110,11 +96,18 @@ def main(use_imu=True, default_velocity=np.zeros(2), default_yaw_rate=0.0, polic
             
             # Get joint positions and velocities
             joint_pos, joint_vel = encoders.read_pos_vel()
-            lin_vel, ang_vel =  imu.read_lin_ang_vel()
+            lin_vel, ang_vel, projected_gravity = imu._simulator_observation()
+
+            # TODO: Construct observation and make sure it is 
+            # consistent with Isaac Gym values (offsets, scales, etc)
+            observation = torch.randn(235)
 
             # Step the controller forward by dt
-            command  = model(torch.randn(235)).view(3,4)
-            controller.send_action(state, command)
+            if use_policy:
+                command = model(observation).view(3,4)
+                controller.send_action(state, command)
+            else:
+                controller.run(state, command)
 
             # Update the pwm widths going to the servos
             hardware_interface.set_actuator_postions(state.joint_angles)
@@ -124,14 +117,8 @@ def main(use_imu=True, default_velocity=np.zeros(2), default_yaw_rate=0.0, polic
 
         # Performance testing
         elapsed = time.time() - start
-        if (steps % 60) == 0:
-            print(
-                "Sim seconds elapsed: {}, Real seconds elapsed: {}".format(
-                    round(sim_time_elapsed, 3), round(elapsed, 3)
-                )
-            )
-            # print("Average steps per second: {0}, elapsed: {1}, i:{2}".format(steps / elapsed, elapsed, i))
-
+        if ((steps + 1) % 1000) == 0:
+            print("Sim seconds elapsed: {}, Real seconds elapsed: {}".format(round(sim_time_elapsed, 3), round(elapsed, 3)))
 
 if __name__ == "__main__":
 
@@ -139,4 +126,4 @@ if __name__ == "__main__":
     models = [file for file in glob.glob(policy_path) if "model" in file]
     last_models_path = models[-1]
 
-    main(default_velocity=np.array([0, 0]), policy_path=last_models_path)
+    main(default_velocity=np.array([0.05, 0]), policy_path=last_models_path)
