@@ -26,7 +26,20 @@ import os
 import glob
 
 
-def get_policy(path, obs_dim = 235, act_dim=12, actor_hidden_dims=[512, 256, 128], critic_hidden_dims=[512, 256, 128]):
+TARGET = [0.1, 0.0]
+ACTION_SCALE = 0.25
+LIN_VEL_SCALE = 2.0
+ANG_VEL_SCALE = 0.25
+DOF_POS_SCALE = 1.0
+DOF_VEL_SCALE = 0.05
+CLIP_OBS = 100.0
+CLIP_ACT = 100.0
+DEFAULT_JOINT_POS = torch.Tensor([-0.15, 0.5, -1.0, 0.15, 0.5, -1.0,
+                                  -0.15, 0.7, -1.0, 0.15, 0.7, -1.0])
+
+
+
+def get_policy(path, obs_dim=48, act_dim=12, actor_hidden_dims=[512, 256, 128], critic_hidden_dims=[512, 256, 128]):
 
     obs_dim_actor = obs_dim
     obs_dim_critic = obs_dim
@@ -45,7 +58,7 @@ def get_policy(path, obs_dim = 235, act_dim=12, actor_hidden_dims=[512, 256, 128
     return actor_critic.act_inference#self.alg.actor_critic.act_inference
 
 
-def main(default_velocity=np.zeros(2), default_yaw_rate=0.0, policy_path=None, use_policy=False):
+def main(default_velocity=np.zeros(2), default_yaw_rate=0.0, policy_path=None, use_policy=True):
     # Create config
     config = Configuration()
     config.z_clearance = 0.02
@@ -86,6 +99,7 @@ def main(default_velocity=np.zeros(2), default_yaw_rate=0.0, policy_path=None, u
     last_control_update = 0
     start = time.time()
 
+    last_action = torch.zeros(12)
     for steps in range(timesteps):
         sim_time_elapsed = sim_dt * steps
         if sim_time_elapsed - last_control_update > config.dt:
@@ -99,12 +113,22 @@ def main(default_velocity=np.zeros(2), default_yaw_rate=0.0, policy_path=None, u
             lin_vel, ang_vel, projected_gravity = imu._simulator_observation()
 
             # TODO: Construct observation and make sure it is 
-            # consistent with Isaac Gym values (offsets, scales, etc)
-            observation = torch.randn(235)
+            # consistent with Isaac Gym values (offsets, scales, etc)          
+            obs = [torch.Tensor(lin_vel) * LIN_VEL_SCALE,
+                   torch.Tensor(ang_vel) * ANG_VEL_SCALE,
+                   torch.Tensor(projected_gravity),
+                   torch.Tensor([TARGET[0], 0, 0]) * LIN_VEL_SCALE, 
+                   (torch.Tensor(joint_pos) - DEFAULT_JOINT_POS) * DOF_POS_SCALE,
+                   torch.Tensor(joint_vel * DOF_VEL_SCALE),
+                   last_action]
+            
+            observation = torch.cat(obs, dim=-1)
 
             # Step the controller forward by dt
             if use_policy:
-                command = model(observation).view(3,4)
+                command = model(observation) * ACTION_SCALE
+                last_action = command
+                command = command.view(4,3).T
                 controller.send_action(state, command)
             else:
                 controller.run(state, command)
@@ -126,4 +150,4 @@ if __name__ == "__main__":
     models = [file for file in glob.glob(policy_path) if "model" in file]
     last_models_path = models[-1]
 
-    main(default_velocity=np.array([0.05, 0]), policy_path=last_models_path)
+    main(default_velocity=np.array([TARGET[0], TARGET[1]]), policy_path=last_models_path)
