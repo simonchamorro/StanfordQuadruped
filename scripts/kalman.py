@@ -4,7 +4,7 @@ import numpy as np
 
 class Kalman:
 
-    def __init__(self, cov=0.2, measurement_cov=5):
+    def __init__(self, cov=0.2, measurement_cov=5, command = np.array( [[0],[0],[0]])):
         #Transition matrix
         self.F_t=np.array([[1,0,0] , [0,1,0] , [0,0,1]])
 
@@ -18,7 +18,7 @@ class Kalman:
         self.B_t=np.array( [ [0, 0, 0] , [0, 0, 0] , [0, 0, 0] ])
 
         #Control vector velocity (Policy)
-        self.U_t= 0 # [3 X 1]
+        self.U_t= command # [3 X 1]
 
         #Measurment Matrix
         self.H_t = np.array([ [1, 0, 0], [ 0, 1, 0], [ 0, 1, 0]])
@@ -49,7 +49,7 @@ class Kalman:
 
         X_hat_t,P_hat_t = self._prediction(self.prev_X_hat_t,self.prev_P_t)
         
-        Z_t = np.array([[data_x], [data_y], [data_z]])
+        Z_t = np.array([[data_x], [data_y], [data_z]])  + X_hat_t
         
         X_t,P_t=update(X_hat_t,P_hat_t,Z_t,R_t,H_t)
         
