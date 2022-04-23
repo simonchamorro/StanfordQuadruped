@@ -34,8 +34,8 @@ DOF_POS_SCALE = 1.0
 DOF_VEL_SCALE = 0.05
 CLIP_OBS = 100.0
 CLIP_ACT = 100.0
-DEFAULT_JOINT_POS = torch.Tensor([-0.15, 0.5, -1.0, 0.15, 0.5, -1.0,
-                                  -0.15, 0.7, -1.0, 0.15, 0.7, -1.0])
+DEFAULT_JOINT_POS = np.array([-0.15, 0.5, -1.0, 0.15, 0.5, -1.0,
+                              -0.15, 0.7, -1.0, 0.15, 0.7, -1.0])
 
 
 
@@ -58,7 +58,7 @@ def get_policy(path, obs_dim=48, act_dim=12, actor_hidden_dims=[512, 256, 128], 
     return actor_critic.act_inference#self.alg.actor_critic.act_inference
 
 
-def main(default_velocity=np.zeros(2), default_yaw_rate=0.0, policy_path=None, use_policy=True):
+def main(default_velocity=np.zeros(2), default_yaw_rate=0.0, policy_path=None, use_policy=False):
     # Create config
     config = Configuration()
     config.z_clearance = 0.02
@@ -91,15 +91,17 @@ def main(default_velocity=np.zeros(2), default_yaw_rate=0.0, policy_path=None, u
     command.yaw_rate = default_yaw_rate
 
     # Run the simulation
-    timesteps = 240 * 60 * 10  # simulate for a max of 10 minutes
+    duration = 10 # seconds
+    timesteps = 50 * duration  # simulate for a max of 10 seconds
 
     # Sim seconds per sim step
-    sim_steps_per_sim_second = 60
+    sim_steps_per_sim_second = 50
     sim_dt = 1.0 / sim_steps_per_sim_second
     last_control_update = 0
     start = time.time()
 
-    last_action = torch.zeros(12)
+    last_action = np.zeros(12)
+    states_history = []
     for steps in range(timesteps):
         sim_time_elapsed = sim_dt * steps
         if sim_time_elapsed - last_control_update > config.dt:
@@ -113,21 +115,23 @@ def main(default_velocity=np.zeros(2), default_yaw_rate=0.0, policy_path=None, u
             lin_vel, ang_vel, projected_gravity = imu._simulator_observation()
 
             # TODO: Construct observation and make sure it is 
-            # consistent with Isaac Gym values (offsets, scales, etc)          
-            obs = [torch.Tensor(lin_vel) * LIN_VEL_SCALE,
-                   torch.Tensor(ang_vel) * ANG_VEL_SCALE,
-                   torch.Tensor(projected_gravity),
-                   torch.Tensor([TARGET[0], 0, 0]) * LIN_VEL_SCALE, 
-                   (torch.Tensor(joint_pos) - DEFAULT_JOINT_POS) * DOF_POS_SCALE,
-                   torch.Tensor(joint_vel * DOF_VEL_SCALE),
+            # consistent with Isaac Gym values (offsets, scales, etc)      
+            obs = [lin_vel * LIN_VEL_SCALE,
+                   ang_vel * ANG_VEL_SCALE,
+                   projected_gravity,
+                   np.array([TARGET[0], 0, 0]) * LIN_VEL_SCALE, 
+                   (np.array(joint_pos) - DEFAULT_JOINT_POS) * DOF_POS_SCALE,
+                   np.array(joint_vel * DOF_VEL_SCALE),
                    last_action]
             
-            observation = torch.cat(obs, dim=-1)
+            observation = np.concatenate(obs, axis=-1)
+            states_history.append(observation)
 
             # Step the controller forward by dt
             if use_policy:
+                observation = torch.from_numpy(observation).float()
                 command = model(observation) * ACTION_SCALE
-                last_action = command
+                last_action = command.detach().cpu().numpy()
                 command = command.view(4,3).T
                 controller.send_action(state, command)
             else:
@@ -143,6 +147,10 @@ def main(default_velocity=np.zeros(2), default_yaw_rate=0.0, policy_path=None, u
         elapsed = time.time() - start
         if ((steps + 1) % 1000) == 0:
             print("Sim seconds elapsed: {}, Real seconds elapsed: {}".format(round(sim_time_elapsed, 3), round(elapsed, 3)))
+    
+    return states_history
+
+
 
 if __name__ == "__main__":
 
@@ -150,4 +158,5 @@ if __name__ == "__main__":
     models = [file for file in glob.glob(policy_path) if "model" in file]
     last_models_path = models[-1]
 
-    main(default_velocity=np.array([TARGET[0], TARGET[1]]), policy_path=last_models_path)
+    states = main(default_velocity=np.array([TARGET[0], TARGET[1]]), policy_path=last_models_path)
+    np.savez("pybullet_states.npz", data=np.array(states))
