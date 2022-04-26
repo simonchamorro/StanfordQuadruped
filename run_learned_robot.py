@@ -8,9 +8,7 @@ from pupper.HardwareInterface import HardwareInterface
 from pupper.Config import Configuration
 from pupper.Kinematics import four_legs_inverse_kinematics
 
-# import rsl_rl module
-from policy.rsl_rl.modules import ActorCritic
-from policy.rsl_rl.algorithms import PPO
+from policy.utils import get_policy
 
 import torch
 import torch.nn as nn
@@ -19,36 +17,16 @@ import torch.functional as F
 import glob
 import os
 
-def get_policy(path, obs_dim = 235, act_dim=12, actor_hidden_dims=[512, 256, 128], critic_hidden_dims=[512, 256, 128]):
-    """
-    Re-use policy learned from ISAAC Gym.
-
-    Parameters:
-    -----------
-    path: relative path to the .pt weight file (str)
-    obs_dim: size of the observations vector (int)
-    act_dim: size of the actions vector (int)
-    actor_hidden_dims: size of each layer of the actor neural network (list)
-    critic_hidden_dims: size of each layer of the critic neural network (list)
-    """
-    obs_dim_actor = obs_dim
-    obs_dim_critic = obs_dim
-
-    if not torch.cuda.is_available():
-        device = torch.device('cpu')
-    else:
-        device = torch.device('cuda')
-
-    loaded_dict = torch.load(path, map_location=device)
-
-    actor_critic = ActorCritic(obs_dim_actor, obs_dim_critic, act_dim, actor_hidden_dims=actor_hidden_dims, critic_hidden_dims=critic_hidden_dims).to(device)
-    alg = PPO(actor_critic, device=device)
-
-    actor_critic.load_state_dict(loaded_dict["model_state_dict"])
-    current_learning_iteration = loaded_dict["iter"]
-    actor_critic.eval()  # switch to evaluation mode (dropout for example)
-    actor_critic.to(device)
-    return actor_critic.act_inference#self.alg.actor_critic.act_inference
+TARGET = [0.1, 0.0]
+ACTION_SCALE = 0.25
+LIN_VEL_SCALE = 2.0
+ANG_VEL_SCALE = 0.25
+DOF_POS_SCALE = 1.0
+DOF_VEL_SCALE = 0.05
+CLIP_OBS = 100.0
+CLIP_ACT = 100.0
+DEFAULT_JOINT_POS = torch.Tensor([-0.15, 0.5, -1.0, 0.15, 0.5, -1.0,
+                                  -0.15, 0.7, -1.0, 0.15, 0.7, -1.0])
 
 def main(use_imu=False, policy_path=None):
     """Main program
@@ -129,4 +107,4 @@ if __name__ == "__main__":
     policy_path = "./policy/pupper/*"
     models = [file for file in glob.glob(policy_path) if "model" in file]
     last_models_path = models[-1]
-    main(policy_path=last_models_path)
+    main(policy_path=last_models_path, obs_dim=48)

@@ -161,7 +161,7 @@ class Controller:
         state.height = command.height
 
 
-    def send_action(self, state, command):
+    def send_action(self, state, command, use_offset=True):
         """Steps the controller forward one timestep given it a command from the policy.
 
         Parameters
@@ -170,13 +170,22 @@ class Controller:
             Robot controller object.
         """
 
+        ## FR, FL, RL, RR
+        # HIP, THIGH, CALF
         offset = np.array([[-0.15, 0.15, -0.15, 0.15],
                            [0.5, 0.5, 0.7, 0.7],
                            [-1.0, -1.0, -1.0, -1.0]])
 
+        #offset = np.array([[-0.15, 0.15, -0.15, 0.15],
+        #                   [0.9, 1.1, 0.9, 1.1],
+        #                   [-1.7, -1.7, -1.7, -1.7]])
+
         actions = command.detach().cpu().numpy()
 
-        state.joint_angles = actions + offset
+        if use_offset:
+            actions = actions + offset
+
+        state.joint_angles = actions
         state.ticks += 1
 
 
